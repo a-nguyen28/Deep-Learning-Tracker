@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deep Focused Work Tracker</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        .week-info {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .timer-display {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .timer-display.inactive {
+            background: #e0e0e0;
+            color: #666;
+        }
+        .category-name {
+            font-size: 18px;
+            margin-bottom: 10px;
+            font-weight: 500;
+        }
+        .time {
+            font-size: 48px;
+            font-weight: bold;
+            font-family: 'Courier New', monospace;
+        }
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        button {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        button:active {
+            transform: translateY(0);
+        }
+        .btn-stop {
+            background: #ef4444;
+            color: white;
+        }
+        .btn-stop:hover {
+            background: #dc2626;
+        }
+        .btn-stop:disabled {
+            background: #fca5a5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .category-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+        .category-btn {
+            padding: 15px;
+            background: #f3f4f6;
+            color: #333;
+            border: 2px solid transparent;
+            transition: all 0.2s ease;
+        }
+        .category-btn:hover {
+            background: #e5e7eb;
+            border-color: #667eea;
+        }
+        .category-btn:disabled {
+            background: #f9fafb;
+            color: #9ca3af;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .message {
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            display: none;
+        }
+        .message.success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #6ee7b7;
+        }
+        .message.error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+        }
+        .message.show {
+            display: block;
+            animation: slideIn 0.3s ease;
+        }
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        .status-badge.active {
+            background: #10b981;
+            color: white;
+        }
+        .status-badge.inactive {
+            background: #6b7280;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📘 Deep Focused Work Tracker</h1>
+        <div class="week-info" id="weekInfo">Week 10</div>
+        <div class="timer-display inactive" id="timerDisplay">
+            <span class="status-badge inactive" id="statusBadge">INACTIVE</span>
+            <div class="category-name" id="categoryName">No category selected</div>
+            <div class="time" id="timeDisplay">0:00:00</div>
+        </div>
+        <div class="controls">
+            <button class="btn-stop" id="stopBtn" disabled>⏹ Stop Timer</button>
+        </div>
+        <div class="category-grid" id="categoryGrid"></div>
+        <div class="message" id="message"></div>
+    </div>
+    <script>
+        const API_BASE = 'http://localhost:5000/api';
+        let timerInterval = null;
+        let currentStartTime = null;
+
+        async function loadCategories() {
+            try {
+                const response = await fetch(`${API_BASE}/categories`);
+                const data = await response.json();
+                document.getElementById('weekInfo').textContent = data.current_week;
+                const grid = document.getElementById('categoryGrid');
+                grid.innerHTML = '';
+                data.categories.forEach(category => {
+                    const btn = document.createElement('button');
+                    btn.className = 'category-btn';
+                    btn.textContent = category;
+                    btn.onclick = () => startTimer(category);
+                    grid.appendChild(btn);
+                });
+            } catch (error) {
+                showMessage('Failed to load categories. Is the server running?', 'error');
+            }
+        }
+
+        async function startTimer(category) {
+            try {
+                const response = await fetch(`${API_BASE}/start`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ category })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    currentStartTime = Date.now() / 1000;
+                    updateTimerDisplay(category, 0);
+                    startTimerInterval();
+                    toggleButtons(true);
+                    showMessage(data.message, 'success');
+                } else {
+                    showMessage(data.message, 'error');
+                }
+            } catch (error) {
+                showMessage('Failed to start timer. Check your connection.', 'error');
+            }
+        }
+
+        async function stopTimer() {
+            try {
+                const response = await fetch(`${API_BASE}/stop`, { method: 'POST' });
+                const data = await response.json();
+                if (data.success) {
+                    stopTimerInterval();
+                    resetDisplay();
+                    toggleButtons(false);
+                    showMessage(`Stopped ${data.category} - Duration: ${data.duration} - Total: ${data.new_total}`, 'success');
+                } else {
+                    showMessage(data.message, 'error');
+                }
+            } catch (error) {
+                showMessage('Failed to stop timer. Check your connection.', 'error');
+            }
+        }
+
+        function updateTimerDisplay(category, elapsed) {
+            const hours = Math.floor(elapsed / 3600);
+            const minutes = Math.floor((elapsed % 3600) / 60);
+            const seconds = Math.floor(elapsed % 60);
+            document.getElementById('categoryName').textContent = category;
+            document.getElementById('timeDisplay').textContent = `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            document.getElementById('timerDisplay').classList.remove('inactive');
+            document.getElementById('statusBadge').textContent = 'ACTIVE';
+            document.getElementById('statusBadge').classList.remove('inactive');
+            document.getElementById('statusBadge').classList.add('active');
+        }
+
+        function startTimerInterval() {
+            timerInterval = setInterval(() => {
+                const elapsed = Date.now() / 1000 - currentStartTime;
+                const category = document.getElementById('categoryName').textContent;
+                updateTimerDisplay(category, elapsed);
+            }, 1000);
+        }
+
+        function stopTimerInterval() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+        }
+
+        function resetDisplay() {
+            document.getElementById('timerDisplay').classList.add('inactive');
+            document.getElementById('categoryName').textContent = 'No category selected';
+            document.getElementById('timeDisplay').textContent = '0:00:00';
+            document.getElementById('statusBadge').textContent = 'INACTIVE';
+            document.getElementById('statusBadge').classList.remove('active');
+            document.getElementById('statusBadge').classList.add('inactive');
+        }
+
+        function toggleButtons(isActive) {
+            document.getElementById('stopBtn').disabled = !isActive;
+            document.querySelectorAll('.category-btn').forEach(btn => { btn.disabled = isActive; });
+        }
+
+        function showMessage(text, type) {
+            const msg = document.getElementById('message');
+            msg.textContent = text;
+            msg.className = `message ${type} show`;
+            setTimeout(() => { msg.classList.remove('show'); }, 5000);
+        }
+
+        async function checkStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/status`);
+                const data = await response.json();
+                if (data.active) {
+                    currentStartTime = Date.now() / 1000 - data.elapsed_seconds;
+                    updateTimerDisplay(data.category, data.elapsed_seconds);
+                    startTimerInterval();
+                    toggleButtons(true);
+                }
+            } catch (error) {
+                console.error('Failed to check status:', error);
+            }
+        }
+
+        document.getElementById('stopBtn').onclick = stopTimer;
+        loadCategories();
+        checkStatus();
+    </script>
+</body>
+</html>
