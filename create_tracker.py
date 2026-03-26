@@ -4,7 +4,7 @@ from openpyxl.utils import get_column_letter
 from datetime import date, timedelta
 
 YEAR = 2026
-OUTPUT_FILE = "Work Tracker 2026.xlsx"
+OUTPUT_FILE = "Work Tracker Template.xlsx"
 
 INITIAL_CATEGORIES = [
     "Classes",
