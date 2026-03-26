@@ -1,312 +1,757 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Deep Focused Work Tracker</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-        }
-        .container {
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            padding: 40px;
-            max-width: 500px;
-            width: 100%;
-        }
-        h1 {
-            color: #333;
-            margin-bottom: 10px;
-            font-size: 28px;
-        }
-        .week-info {
-            color: #666;
-            margin-bottom: 30px;
-            font-size: 14px;
-        }
-        .timer-display {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 30px;
-            border-radius: 15px;
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        .timer-display.inactive {
-            background: #e0e0e0;
-            color: #666;
-        }
-        .category-name {
-            font-size: 18px;
-            margin-bottom: 10px;
-            font-weight: 500;
-        }
-        .time {
-            font-size: 48px;
-            font-weight: bold;
-            font-family: 'Courier New', monospace;
-        }
-        .controls {
-            display: flex;
-            gap: 15px;
-            margin-bottom: 30px;
-        }
-        button {
-            flex: 1;
-            padding: 15px;
-            border: none;
-            border-radius: 10px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
-        }
-        button:active {
-            transform: translateY(0);
-        }
-        .btn-stop {
-            background: #ef4444;
-            color: white;
-        }
-        .btn-stop:hover {
-            background: #dc2626;
-        }
-        .btn-stop:disabled {
-            background: #fca5a5;
-            cursor: not-allowed;
-            transform: none;
-        }
-        .category-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
-        }
-        .category-btn {
-            padding: 15px;
-            background: #f3f4f6;
-            color: #333;
-            border: 2px solid transparent;
-            transition: all 0.2s ease;
-        }
-        .category-btn:hover {
-            background: #e5e7eb;
-            border-color: #667eea;
-        }
-        .category-btn:disabled {
-            background: #f9fafb;
-            color: #9ca3af;
-            cursor: not-allowed;
-            transform: none;
-        }
-        .message {
-            padding: 15px;
-            border-radius: 10px;
-            margin-top: 20px;
-            display: none;
-        }
-        .message.success {
-            background: #d1fae5;
-            color: #065f46;
-            border: 1px solid #6ee7b7;
-        }
-        .message.error {
-            background: #fee2e2;
-            color: #991b1b;
-            border: 1px solid #fca5a5;
-        }
-        .message.show {
-            display: block;
-            animation: slideIn 0.3s ease;
-        }
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateY(-10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        .status-badge {
-            display: inline-block;
-            padding: 5px 15px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-            margin-bottom: 10px;
-        }
-        .status-badge.active {
-            background: #10b981;
-            color: white;
-        }
-        .status-badge.inactive {
-            background: #6b7280;
-            color: white;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Work Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Space+Grotesk:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --surface2: #1a1a24;
+    --border: #2a2a38;
+    --accent: #7c6af7;
+    --accent-dim: #4a3fa8;
+    --green: #4ade80;
+    --red: #f87171;
+    --text: #e8e8f0;
+    --muted: #6b6b80;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Space Grotesk', sans-serif;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px;
+  }
+
+  /* subtle grid texture */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(124,106,247,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(124,106,247,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 560px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  header {
+    text-align: center;
+    padding: 10px 0 4px;
+  }
+
+  header h1 {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 400;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  #date-display {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 4px;
+    letter-spacing: 0.1em;
+  }
+
+  /* ── main card ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px;
+  }
+
+  /* ── category input ── */
+  .input-wrapper {
+    position: relative;
+    margin-bottom: 20px;
+  }
+
+  .input-label {
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-family: var(--mono);
+    margin-bottom: 8px;
+    display: block;
+  }
+
+  #category-input {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-family: var(--sans);
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  #category-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(124,106,247,0.12);
+  }
+
+  #category-input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* autocomplete dropdown */
+  #autocomplete-list {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0; right: 0;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    z-index: 100;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    display: none;
+  }
+
+  .autocomplete-item {
+    padding: 10px 16px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.1s;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .autocomplete-item:hover,
+  .autocomplete-item.active {
+    background: rgba(124,106,247,0.15);
+    color: var(--accent);
+  }
+
+  .autocomplete-item .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    opacity: 0.6;
+    flex-shrink: 0;
+  }
+
+  .new-badge {
+    margin-left: auto;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-family: var(--mono);
+    color: var(--green);
+    background: rgba(74,222,128,0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid rgba(74,222,128,0.25);
+  }
+
+  /* ── timer display ── */
+  .timer-display {
+    text-align: center;
+    padding: 16px 0;
+  }
+
+  #timer {
+    font-family: var(--mono);
+    font-size: 52px;
+    font-weight: 300;
+    letter-spacing: -0.02em;
+    color: var(--text);
+    line-height: 1;
+    transition: color 0.3s;
+  }
+
+  #timer.running {
+    color: var(--green);
+  }
+
+  #timer-category {
+    font-size: 12px;
+    font-family: var(--mono);
+    color: var(--muted);
+    margin-top: 8px;
+    letter-spacing: 0.1em;
+    min-height: 18px;
+  }
+
+  /* ── buttons ── */
+  .btn-row {
+    display: flex;
+    gap: 12px;
+    margin-top: 20px;
+  }
+
+  button {
+    flex: 1;
+    padding: 13px;
+    border-radius: 8px;
+    border: none;
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.03em;
+  }
+
+  #btn-start {
+    background: var(--accent);
+    color: white;
+  }
+
+  #btn-start:hover:not(:disabled) {
+    background: #9182ff;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 20px rgba(124,106,247,0.35);
+  }
+
+  #btn-pause {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    flex: 0.7;
+  }
+
+  #btn-pause:not(:disabled) {
+    border-color: #fbbf24;
+    color: #fbbf24;
+  }
+
+  #btn-pause:not(:disabled):hover {
+    background: rgba(251,191,36,0.1);
+    transform: translateY(-1px);
+  }
+
+  #btn-pause.resuming:not(:disabled) {
+    border-color: var(--green);
+    color: var(--green);
+  }
+
+  #btn-pause.resuming:not(:disabled):hover {
+    background: rgba(74,222,128,0.1);
+  }
+
+  #btn-stop {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  #btn-stop:not(:disabled) {
+    border-color: var(--red);
+    color: var(--red);
+  }
+
+  #btn-stop:not(:disabled):hover {
+    background: rgba(248,113,113,0.1);
+    transform: translateY(-1px);
+  }
+
+  button:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    transform: none !important;
+  }
+
+  /* ── status message ── */
+  #status-msg {
+    font-family: var(--mono);
+    font-size: 11px;
+    text-align: center;
+    min-height: 16px;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+    margin-top: 8px;
+    transition: color 0.3s;
+  }
+
+  #status-msg.success { color: var(--green); }
+  #status-msg.error   { color: var(--red); }
+
+  /* ── today's log ── */
+  .section-label {
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-family: var(--mono);
+    margin-bottom: 12px;
+  }
+
+  #today-log {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .log-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 9px 14px;
+    background: var(--surface2);
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    animation: fadeIn 0.25s ease;
+  }
+
+  .log-cat {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  .log-time {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent);
+  }
+
+  .log-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+
+  .log-header .section-label { margin-bottom: 0; }
+
+  #btn-refresh {
+    flex: none;
+    width: 28px; height: 28px;
+    padding: 0;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--muted);
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  #btn-refresh:hover { color: var(--accent); border-color: var(--accent); transform: rotate(90deg); }
+
+  .empty-log {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    text-align: center;
+    padding: 16px;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  /* pulse ring when running */
+  .pulse-ring {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+    margin-right: 8px;
+    position: relative;
+    top: -1px;
+    vertical-align: middle;
+  }
+
+  .pulse-ring::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    border: 2px solid var(--green);
+    animation: pulse 1.4s ease-out infinite;
+    opacity: 0;
+  }
+
+  @keyframes pulse {
+    0%   { transform: scale(0.8); opacity: 0.8; }
+    100% { transform: scale(2); opacity: 0; }
+  }
+</style>
 </head>
 <body>
-    <div class="container">
-        <h1>📘 Deep Focused Work Tracker</h1>
-        <div class="week-info" id="weekInfo">Week 10</div>
-        <div class="timer-display inactive" id="timerDisplay">
-            <span class="status-badge inactive" id="statusBadge">INACTIVE</span>
-            <div class="category-name" id="categoryName">No category selected</div>
-            <div class="time" id="timeDisplay">0:00:00</div>
-        </div>
-        <div class="controls">
-            <button class="btn-stop" id="stopBtn" disabled>⏹ Stop Timer</button>
-        </div>
-        <div class="category-grid" id="categoryGrid"></div>
-        <div class="message" id="message"></div>
+<div class="container">
+
+  <header>
+    <h1>Work Tracker</h1>
+    <div id="date-display"></div>
+  </header>
+
+  <!-- main card -->
+  <div class="card">
+    <div class="input-wrapper">
+      <span class="input-label">Category</span>
+      <input
+        id="category-input"
+        type="text"
+        placeholder="e.g. Coursework, UAV Lab..."
+        autocomplete="off"
+        spellcheck="false"
+      />
+      <div id="autocomplete-list"></div>
     </div>
-    <script>
-        const API_BASE = 'http://localhost:5000/api';
-        let timerInterval = null;
-        let currentStartTime = null;
 
-        async function loadCategories() {
-            try {
-                const response = await fetch(`${API_BASE}/categories`);
-                const data = await response.json();
-                document.getElementById('weekInfo').textContent = data.current_week;
-                const grid = document.getElementById('categoryGrid');
-                grid.innerHTML = '';
-                data.categories.forEach(category => {
-                    const btn = document.createElement('button');
-                    btn.className = 'category-btn';
-                    btn.textContent = category;
-                    btn.onclick = () => startTimer(category);
-                    grid.appendChild(btn);
-                });
-            } catch (error) {
-                showMessage('Failed to load categories. Is the server running?', 'error');
-            }
-        }
+    <div class="timer-display">
+      <div id="timer">0:00:00</div>
+      <div id="timer-category">&nbsp;</div>
+    </div>
 
-        async function startTimer(category) {
-            try {
-                const response = await fetch(`${API_BASE}/start`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ category })
-                });
-                const data = await response.json();
-                if (data.success) {
-                    currentStartTime = Date.now() / 1000;
-                    updateTimerDisplay(category, 0);
-                    startTimerInterval();
-                    toggleButtons(true);
-                    showMessage(data.message, 'success');
-                } else {
-                    showMessage(data.message, 'error');
-                }
-            } catch (error) {
-                showMessage('Failed to start timer. Check your connection.', 'error');
-            }
-        }
+    <div class="btn-row">
+      <button id="btn-start">Start</button>
+      <button id="btn-pause" disabled>Pause</button>
+      <button id="btn-stop" disabled>Stop</button>
+    </div>
 
-        async function stopTimer() {
-            try {
-                const response = await fetch(`${API_BASE}/stop`, { method: 'POST' });
-                const data = await response.json();
-                if (data.success) {
-                    stopTimerInterval();
-                    resetDisplay();
-                    toggleButtons(false);
-                    showMessage(`Stopped ${data.category} - Duration: ${data.duration} - Total: ${data.new_total}`, 'success');
-                } else {
-                    showMessage(data.message, 'error');
-                }
-            } catch (error) {
-                showMessage('Failed to stop timer. Check your connection.', 'error');
-            }
-        }
+    <div id="status-msg"></div>
+  </div>
 
-        function updateTimerDisplay(category, elapsed) {
-            const hours = Math.floor(elapsed / 3600);
-            const minutes = Math.floor((elapsed % 3600) / 60);
-            const seconds = Math.floor(elapsed % 60);
-            document.getElementById('categoryName').textContent = category;
-            document.getElementById('timeDisplay').textContent = `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-            document.getElementById('timerDisplay').classList.remove('inactive');
-            document.getElementById('statusBadge').textContent = 'ACTIVE';
-            document.getElementById('statusBadge').classList.remove('inactive');
-            document.getElementById('statusBadge').classList.add('active');
-        }
+  <!-- today's log -->
+  <div class="card">
+    <div class="log-header">
+      <div class="section-label">Today's log</div>
+      <button id="btn-refresh" title="Refresh from spreadsheet">↻</button>
+    </div>
+    <div id="today-log"><div class="empty-log">nothing tracked yet today</div></div>
+  </div>
 
-        function startTimerInterval() {
-            timerInterval = setInterval(() => {
-                const elapsed = Date.now() / 1000 - currentStartTime;
-                const category = document.getElementById('categoryName').textContent;
-                updateTimerDisplay(category, elapsed);
-            }, 1000);
-        }
+</div>
 
-        function stopTimerInterval() {
-            if (timerInterval) {
-                clearInterval(timerInterval);
-                timerInterval = null;
-            }
-        }
+<script>
+const API = '';
+let categories = [];
+let timerInterval = null;
+let activeIndex = -1;
 
-        function resetDisplay() {
-            document.getElementById('timerDisplay').classList.add('inactive');
-            document.getElementById('categoryName').textContent = 'No category selected';
-            document.getElementById('timeDisplay').textContent = '0:00:00';
-            document.getElementById('statusBadge').textContent = 'INACTIVE';
-            document.getElementById('statusBadge').classList.remove('active');
-            document.getElementById('statusBadge').classList.add('inactive');
-        }
+// ── date display ──────────────────────────────────────────
+const now = new Date();
+document.getElementById('date-display').textContent =
+  now.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' }).toUpperCase();
 
-        function toggleButtons(isActive) {
-            document.getElementById('stopBtn').disabled = !isActive;
-            document.querySelectorAll('.category-btn').forEach(btn => { btn.disabled = isActive; });
-        }
+// ── fetch categories ──────────────────────────────────────
+async function loadCategories() {
+  try {
+    const r = await fetch(`${API}/api/categories`);
+    const d = await r.json();
+    categories = d.categories || [];
+  } catch(e) { console.warn('Could not load categories', e); }
+}
 
-        function showMessage(text, type) {
-            const msg = document.getElementById('message');
-            msg.textContent = text;
-            msg.className = `message ${type} show`;
-            setTimeout(() => { msg.classList.remove('show'); }, 5000);
-        }
+// ── autocomplete ──────────────────────────────────────────
+const input = document.getElementById('category-input');
+const list  = document.getElementById('autocomplete-list');
 
-        async function checkStatus() {
-            try {
-                const response = await fetch(`${API_BASE}/status`);
-                const data = await response.json();
-                if (data.active) {
-                    currentStartTime = Date.now() / 1000 - data.elapsed_seconds;
-                    updateTimerDisplay(data.category, data.elapsed_seconds);
-                    startTimerInterval();
-                    toggleButtons(true);
-                }
-            } catch (error) {
-                console.error('Failed to check status:', error);
-            }
-        }
+function showAutocomplete(val) {
+  list.innerHTML = '';
+  activeIndex = -1;
+  if (!categories.length) { list.style.display = 'none'; return; }
 
-        document.getElementById('stopBtn').onclick = stopTimer;
-        loadCategories();
-        checkStatus();
-    </script>
+  const q = val.toLowerCase();
+  const matches = val ? categories.filter(c => c.toLowerCase().includes(q)) : [...categories];
+  const exactMatch = categories.some(c => c.toLowerCase() === q);
+
+  const items = [...matches];
+  if (!exactMatch && val.trim()) {
+    items.push({ label: val.trim(), isNew: true });
+  }
+
+  if (!items.length) { list.style.display = 'none'; return; }
+
+  items.forEach((item, i) => {
+    const div = document.createElement('div');
+    div.className = 'autocomplete-item';
+    const name = typeof item === 'string' ? item : item.label;
+    const isNew = typeof item === 'object' && item.isNew;
+
+    div.innerHTML = `<span class="dot"></span><span>${name}</span>${isNew ? '<span class="new-badge">new</span>' : ''}`;
+    div.addEventListener('mousedown', e => {
+      e.preventDefault();
+      input.value = name;
+      list.style.display = 'none';
+    });
+    list.appendChild(div);
+  });
+
+  list.style.display = 'block';
+}
+
+input.addEventListener('input', () => showAutocomplete(input.value));
+input.addEventListener('blur', () => setTimeout(() => list.style.display = 'none', 150));
+input.addEventListener('focus', () => showAutocomplete(input.value));
+
+input.addEventListener('keydown', e => {
+  const items = list.querySelectorAll('.autocomplete-item');
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    activeIndex = Math.min(activeIndex + 1, items.length - 1);
+    items.forEach((el, i) => el.classList.toggle('active', i === activeIndex));
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    activeIndex = Math.max(activeIndex - 1, -1);
+    items.forEach((el, i) => el.classList.toggle('active', i === activeIndex));
+  } else if (e.key === 'Enter') {
+    if (activeIndex >= 0 && items[activeIndex]) {
+      input.value = items[activeIndex].querySelector('span:nth-child(2)').textContent;
+      list.style.display = 'none';
+    } else {
+      startTimer();
+    }
+  } else if (e.key === 'Escape') {
+    list.style.display = 'none';
+  }
+});
+
+// ── timer ─────────────────────────────────────────────────
+function fmtSeconds(s) {
+  s = Math.floor(s);
+  return `${Math.floor(s/3600)}:${String(Math.floor((s%3600)/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+}
+
+let startTs = null;
+
+function startLocalTimer(category) {
+  startTs = Date.now();
+  const timerEl = document.getElementById('timer');
+  const catEl   = document.getElementById('timer-category');
+  timerEl.classList.add('running');
+  catEl.innerHTML = `<span class="pulse-ring"></span>${category}`;
+
+  timerInterval = setInterval(() => {
+    timerEl.textContent = fmtSeconds((Date.now() - startTs) / 1000);
+  }, 1000);
+}
+
+function stopLocalTimer() {
+  clearInterval(timerInterval);
+  timerInterval = null;
+  document.getElementById('timer').classList.remove('running');
+  document.getElementById('timer').textContent = '0:00:00';
+  document.getElementById('timer-category').innerHTML = '&nbsp;';
+}
+
+function freezeLocalTimer() {
+  clearInterval(timerInterval);
+  timerInterval = null;
+  document.getElementById('timer').classList.remove('running');
+}
+
+// ── button state helper ───────────────────────────────────
+function setButtons({ running, paused }) {
+  const btnStart = document.getElementById('btn-start');
+  const btnPause = document.getElementById('btn-pause');
+  const btnStop  = document.getElementById('btn-stop');
+
+  if (!running) {
+    // idle
+    btnStart.disabled = false;
+    btnPause.disabled = true;
+    btnPause.textContent = 'Pause';
+    btnPause.classList.remove('resuming');
+    btnStop.disabled = true;
+    input.disabled = false;
+  } else if (paused) {
+    // paused
+    btnStart.disabled = true;
+    btnPause.disabled = false;
+    btnPause.textContent = 'Resume';
+    btnPause.classList.add('resuming');
+    btnStop.disabled = false;
+  } else {
+    // running
+    btnStart.disabled = true;
+    btnPause.disabled = false;
+    btnPause.textContent = 'Pause';
+    btnPause.classList.remove('resuming');
+    btnStop.disabled = false;
+    input.disabled = true;
+  }
+}
+
+// ── API calls ─────────────────────────────────────────────
+function setStatus(msg, type = '') {
+  const el = document.getElementById('status-msg');
+  el.textContent = msg;
+  el.className = type;
+}
+
+async function startTimer() {
+  const cat = input.value.trim();
+  if (!cat) { setStatus('enter a category first', 'error'); return; }
+
+  try {
+    const r = await fetch(`${API}/api/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category: cat })
+    });
+    const d = await r.json();
+    if (!d.success) { setStatus(d.message, 'error'); return; }
+
+    if (!categories.includes(cat)) categories.push(cat);
+
+    bankedSeconds = 0;
+    setButtons({ running: true, paused: false });
+    startLocalTimer(cat);
+    setStatus(`tracking · ${d.day}`, '');
+  } catch(e) {
+    setStatus('server error', 'error');
+  }
+}
+
+let bankedSeconds = 0;  // locally tracked paused time
+
+async function pauseOrResume() {
+  const paused = document.getElementById('btn-pause').classList.contains('resuming');
+
+  try {
+    const endpoint = paused ? '/api/resume' : '/api/pause';
+    const r = await fetch(`${API}${endpoint}`, { method: 'POST' });
+    const d = await r.json();
+    if (!d.success) { setStatus(d.message, 'error'); return; }
+
+    if (paused) {
+      // resuming — restart ticker from locally banked seconds
+      startTs = Date.now() - bankedSeconds * 1000;
+      const timerEl = document.getElementById('timer');
+      timerEl.classList.add('running');
+      timerInterval = setInterval(() => {
+        timerEl.textContent = fmtSeconds((Date.now() - startTs) / 1000);
+      }, 1000);
+      setButtons({ running: true, paused: false });
+      setStatus(`resumed · ${timer_state_category}`, '');
+    } else {
+      // pausing — bank current elapsed locally, freeze display
+      bankedSeconds = (Date.now() - startTs) / 1000;
+      freezeLocalTimer();
+      document.getElementById('timer').textContent = fmtSeconds(bankedSeconds);
+      setButtons({ running: true, paused: true });
+      setStatus(`paused · ${fmtSeconds(bankedSeconds)}`, '');
+    }
+  } catch(e) {
+    setStatus('server error', 'error');
+  }
+}
+
+let timer_state_category = '';
+
+async function stopTimer() {
+  try {
+    const r = await fetch(`${API}/api/stop`, { method: 'POST' });
+    const d = await r.json();
+    if (!d.success) { setStatus(d.message, 'error'); return; }
+
+    bankedSeconds = 0;
+    stopLocalTimer();
+    input.value = '';
+    timer_state_category = '';
+    setButtons({ running: false, paused: false });
+
+    const msg = d.is_new_category
+      ? `✦ new category created · ${d.duration} logged`
+      : `saved · ${d.duration} · total today: ${d.new_total}`;
+    setStatus(msg, 'success');
+
+    loadTodayLog();
+  } catch(e) {
+    setStatus('server error', 'error');
+  }
+}
+
+// ── today's log ───────────────────────────────────────────
+async function loadTodayLog() {
+  try {
+    const r = await fetch(`${API}/api/today`);
+    const d = await r.json();
+    const logEl = document.getElementById('today-log');
+
+    if (!d.totals || !d.totals.length) {
+      logEl.innerHTML = '<div class="empty-log">nothing tracked yet today</div>';
+      return;
+    }
+
+    logEl.innerHTML = d.totals.map(t => `
+      <div class="log-row">
+        <span class="log-cat">${t.category}</span>
+        <span class="log-time">${t.total}</span>
+      </div>
+    `).join('');
+  } catch(e) { /* silence */ }
+}
+
+// ── restore active timer on load ──────────────────────────
+async function checkStatus() {
+  try {
+    const r = await fetch(`${API}/api/status`);
+    const d = await r.json();
+    if (d.active) {
+      input.value = d.category;
+      timer_state_category = d.category;
+
+      if (d.paused) {
+        document.getElementById('timer').textContent = d.elapsed;
+        setButtons({ running: true, paused: true });
+        setStatus(`paused · ${d.elapsed}`, '');
+      } else {
+        startTs = Date.now() - d.elapsed_seconds * 1000;
+        startLocalTimer(d.category);
+        setButtons({ running: true, paused: false });
+        setStatus(`tracking · ${d.category}`, '');
+      }
+    }
+  } catch(e) { /* server not up yet */ }
+}
+
+document.getElementById('btn-start').addEventListener('click', startTimer);
+document.getElementById('btn-pause').addEventListener('click', pauseOrResume);
+document.getElementById('btn-stop').addEventListener('click', stopTimer);
+document.getElementById('btn-refresh').addEventListener('click', loadTodayLog);
+
+// auto-refresh log every 30s
+setInterval(loadTodayLog, 30000);
+
+// ── init ──────────────────────────────────────────────────
+(async () => {
+  await loadCategories();
+  await checkStatus();
+  await loadTodayLog();
+})();
+</script>
 </body>
 </html>

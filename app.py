@@ -1,329 +1,289 @@
 from flask import Flask, send_from_directory, request, jsonify
 from flask_cors import CORS
 import openpyxl
-from openpyxl.styles import Alignment
-from datetime import datetime, timedelta
-import datetime as dtmod
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
+from datetime import datetime, timedelta, date
 import time
 import os
 import logging
 import webbrowser
 import threading
 
-# Setup logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 app = Flask(__name__, static_folder='.')
 CORS(app)
 
-# === CONFIG ===
-EXCEL_FILE = "Deep Focused Work Tracker(Winter 2026).xlsx"
+EXCEL_FILE = "Work Tracker 2026.xlsx"
+YEAR = 2026
 
-# IMPORTANT: Set this to the first Monday of your semester
-SEMESTER_START = datetime(2026, 1, 5)  # CHANGE THIS DATE!
-
-def get_current_week():
-    """Calculate current week number based on semester start date"""
-    today = datetime.now()
-    days_elapsed = (today - SEMESTER_START).days
-    
-    # If before semester start, default to Week 1
-    if days_elapsed < 0:
-        logging.warning(f"Current date is before semester start ({SEMESTER_START.date()}). Using Week 1.")
-        return "Week 1"
-    
-    week_num = (days_elapsed // 7) + 1
-    logging.info(f"Calculated current week: Week {week_num}")
-    return f"Week {week_num}"
-
-CURRENT_WEEK = get_current_week()
-
-CATEGORIES = [
-    "Classes",
-    "Personal",
-    "Coursework",
-    "Altium",
-    "UAV Lab",
-    "Machine Learning",
-    "Combat Clubs"
-]
-DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-
-# === TIMER STATE ===
+# ── timer state ──────────────────────────────────────────────
+# accumulated_seconds: time banked from before the current start (for pause/resume)
 timer_state = {
     "start_time": None,
-    "active_category": None
+    "active_category": None,
+    "paused": False,
+    "accumulated_seconds": 0.0
 }
 
-# === EXCEL HELPERS ===
+# ── helpers ──────────────────────────────────────────────────
 
-def get_existing_timedelta(cell_value):
-    """Parse Excel cell value into timedelta, handling multiple formats"""
-    
-    # Empty cell
-    if cell_value is None or cell_value == "":
-        return timedelta()
-    
-    # Excel stores time as decimal fraction of days
-    if isinstance(cell_value, (int, float)):
-        days = float(cell_value)
-        logging.debug(f"Parsed numeric value {cell_value} as {days} days")
-        return timedelta(seconds=days * 24 * 3600)
+def day_col_for_date(ws, target: date):
+    label = f"{target.strftime('%a')}\n{target.month}/{target.day}"
+    for col in range(2, ws.max_column + 2):
+        if ws.cell(row=1, column=col).value == label:
+            return col
+    return None
 
-    # Excel time object
-    if isinstance(cell_value, dtmod.time):
-        td = timedelta(hours=cell_value.hour, minutes=cell_value.minute, seconds=cell_value.second)
-        logging.debug(f"Parsed time object {cell_value} as {td}")
-        return td
+def get_categories(ws):
+    cats = []
+    for row in range(2, ws.max_row + 1):
+        val = ws.cell(row=row, column=1).value
+        if val:
+            cats.append(str(val).strip())
+    return cats
 
-    # Try parsing as string
+def find_category_row(ws, category):
+    for row in range(2, ws.max_row + 1):
+        if ws.cell(row=row, column=1).value == category:
+            return row
+    return None
+
+def add_category_row(ws, category):
+    new_row = ws.max_row + 1
+    thin = Side(style="thin", color="e5e7eb")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    is_even = (new_row % 2 == 0)
+    fill = PatternFill("solid", start_color="f8f9fa" if is_even else "ffffff")
+
+    cat_cell = ws.cell(row=new_row, column=1)
+    cat_cell.value = category
+    cat_cell.font = Font(name="Calibri", bold=True, size=10, color="1a1a2e")
+    cat_cell.fill = fill
+    cat_cell.alignment = Alignment(horizontal="left", vertical="center")
+    cat_cell.border = border
+    ws.row_dimensions[new_row].height = 18
+
+    for i in range(365):
+        col = i + 2
+        cell = ws.cell(row=new_row, column=col)
+        cell.value = 0
+        cell.number_format = '[h]:mm:ss'
+        cell.font = Font(name="Calibri", size=9, color="374151")
+        cell.fill = fill
+        cell.alignment = Alignment(horizontal="right", vertical="center")
+        cell.border = border
+
+    logging.info(f"Added new category: '{category}' at row {new_row}")
+    return new_row
+
+def get_cell_seconds(cell):
+    """Parse cell value into total seconds — handles all types openpyxl may return."""
+    val = cell.value
+    if val is None or val == "" or val == 0:
+        return 0.0
+    # openpyxl reads back time-formatted cells as timedelta objects
+    if isinstance(val, timedelta):
+        return val.total_seconds()
+    if isinstance(val, (int, float)):
+        return float(val) * 86400  # Excel day fraction
+    if hasattr(val, 'hour'):  # time object
+        return val.hour * 3600 + val.minute * 60 + val.second
     try:
-        s = str(cell_value).strip()
-        if s == "" or s in ("0", "0.0", "0:00:00"):
-            return timedelta()
-        
-        # Try as float first
-        try:
-            f = float(s)
-            if abs(f) < 1:
-                # Small number = fraction of day
-                return timedelta(seconds=f * 24 * 3600)
-            else:
-                # Large number = hours
-                return timedelta(seconds=f * 3600)
-        except ValueError:
-            # Not a number, try time string format
-            return parse_time_string(s)
-            
-    except Exception as e:
-        logging.error(f"Failed to parse cell value '{cell_value}': {e}")
-        return timedelta()
-
-def get_sheet():
-    """Load Excel workbook and return current week's sheet"""
-    if not os.path.exists(EXCEL_FILE):
-        raise FileNotFoundError(f"Excel file '{EXCEL_FILE}' not found in current directory.")
-    
-    wb = openpyxl.load_workbook(EXCEL_FILE)
-    
-    if CURRENT_WEEK not in wb.sheetnames:
-        available_sheets = ", ".join(wb.sheetnames)
-        raise ValueError(
-            f"Sheet '{CURRENT_WEEK}' not found in workbook. "
-            f"Available sheets: {available_sheets}"
-        )
-    
-    return wb, wb[CURRENT_WEEK]
-
-def parse_time_string(time_str):
-    """Parse time string in formats like '2:30:15' or '150:45:30'"""
-    if not time_str or time_str.strip() == "" or time_str == "0:00:00":
-        return timedelta()
-
-    s = time_str.strip()
-    
-    # Try as float
-    try:
-        f = float(s)
-        if abs(f) < 1:
-            return timedelta(seconds=f * 24 * 3600)
-        return timedelta(seconds=f * 3600)
-    except ValueError:
-        pass
-
-    # Parse as H:M:S format
-    parts = [p.strip() for p in s.split(":") if p.strip() != ""]
-    try:
+        parts = str(val).strip().split(":")
         if len(parts) == 3:
-            h = int(float(parts[0]))
-            m = int(float(parts[1]))
-            sec = int(float(parts[2]))
-        elif len(parts) == 2:
-            h = 0
-            m = int(float(parts[0]))
-            sec = int(float(parts[1]))
-        elif len(parts) == 1:
-            sec = int(float(parts[0]))
-            h = 0
-            m = 0
-        else:
-            raise ValueError(f"Unrecognized time format: '{time_str}'")
-    except Exception as e:
-        raise ValueError(f"Couldn't parse time string '{time_str}': {e}")
+            return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+    except Exception:
+        pass
+    return 0.0
 
-    return timedelta(hours=h, minutes=m, seconds=sec)
+def fmt(seconds):
+    s = int(seconds)
+    return f"{s//3600}:{(s%3600)//60:02}:{s%60:02}"
 
-def format_timedelta(td):
-    """Format timedelta as H:MM:SS"""
-    total_seconds = int(td.total_seconds())
-    h = total_seconds // 3600
-    m = (total_seconds % 3600) // 60
-    s = total_seconds % 60
-    return f"{h}:{m:02}:{s:02}"
+def current_elapsed():
+    """Total elapsed seconds including any accumulated paused time."""
+    acc = timer_state["accumulated_seconds"]
+    if timer_state["start_time"] and not timer_state["paused"]:
+        acc += time.time() - timer_state["start_time"]
+    return acc
 
-def update_excel(category, day, elapsed):
-    """Update Excel cell with new time value"""
-    try:
-        wb, ws = get_sheet()
+def update_excel(category, target_date, elapsed_seconds):
+    if not os.path.exists(EXCEL_FILE):
+        raise FileNotFoundError(f"'{EXCEL_FILE}' not found.")
 
-        cat_row = CATEGORIES.index(category) + 2
-        day_col = DAYS.index(day) + 2
+    wb = openpyxl.load_workbook(EXCEL_FILE)
+    ws = wb.active
 
-        cell = ws.cell(row=cat_row, column=day_col)
+    col = day_col_for_date(ws, target_date)
+    if col is None:
+        raise ValueError(f"No column found for {target_date}")
 
-        # Get existing time
-        td_existing = get_existing_timedelta(cell.value)
-        existing_seconds = td_existing.total_seconds()
-        
-        # Add new elapsed time
-        elapsed_seconds = elapsed.total_seconds()
-        total_seconds = existing_seconds + elapsed_seconds
-        
-        # Convert to days for Excel (Excel stores as decimal fraction of days)
-        new_value = total_seconds / (24 * 3600)
-        
-        logging.info(
-            f"Updating {category}/{day}: "
-            f"existing={format_timedelta(td_existing)}, "
-            f"elapsed={format_timedelta(elapsed)}, "
-            f"new_total={format_timedelta(timedelta(seconds=total_seconds))}"
-        )
-        
-        cell.value = new_value
-        cell.number_format = '[h]:mm:ss'  # [h] allows hours > 24
-        cell.alignment = Alignment(horizontal='right')
+    row = find_category_row(ws, category)
+    is_new = row is None
+    if is_new:
+        row = add_category_row(ws, category)
 
-        wb.save(EXCEL_FILE)
-        
-        # Format for display
-        hours = int(total_seconds // 3600)
-        minutes = int((total_seconds % 3600) // 60)
-        seconds = int(total_seconds % 60)
-        
-        return f"{hours}:{minutes:02}:{seconds:02}"
-        
-    except Exception as e:
-        logging.error(f"Error updating Excel: {e}", exc_info=True)
-        raise
+    cell = ws.cell(row=row, column=col)
+    existing = get_cell_seconds(cell)
+    total = existing + elapsed_seconds
 
-# === API ROUTES ===
+    cell.value = total / 86400
+    cell.number_format = '[h]:mm:ss'
+    cell.alignment = Alignment(horizontal="right", vertical="center")
+
+    wb.save(EXCEL_FILE)
+    logging.info(f"Updated '{category}' on {target_date}: +{fmt(elapsed_seconds)}, total={fmt(total)}")
+    return fmt(total), is_new
+
+# ── routes ────────────────────────────────────────────────────
 
 @app.route('/')
 def index():
     return send_from_directory('.', 'index.html')
 
+@app.route('/api/categories', methods=['GET'])
+def api_categories():
+    try:
+        wb = openpyxl.load_workbook(EXCEL_FILE)
+        ws = wb.active
+        cats = get_categories(ws)
+        return jsonify({"categories": cats})
+    except Exception as e:
+        return jsonify({"categories": [], "error": str(e)})
+
 @app.route('/api/start', methods=['POST'])
 def api_start():
     data = request.json
-    category = data.get('category')
-    
+    category = data.get('category', '').strip()
+
+    if not category:
+        return jsonify({"success": False, "message": "Category cannot be empty."}), 400
+
     if timer_state["active_category"]:
         return jsonify({
             "success": False,
             "message": f"Timer already running for '{timer_state['active_category']}'. Stop it first."
         }), 400
-    
-    if category not in CATEGORIES:
-        return jsonify({
-            "success": False,
-            "message": f"Invalid category. Valid options: {CATEGORIES}"
-        }), 400
-    
+
     timer_state["start_time"] = time.time()
     timer_state["active_category"] = category
-    
-    today = DAYS[datetime.today().weekday()]
-    
-    logging.info(f"Started timer for '{category}' on {today}")
-    
+    timer_state["paused"] = False
+    timer_state["accumulated_seconds"] = 0.0
+
+    today = datetime.today().strftime("%A, %B %d").replace(" 0", " ")
+    logging.info(f"Started timer for '{category}'")
+    return jsonify({"success": True, "category": category, "day": today})
+
+@app.route('/api/pause', methods=['POST'])
+def api_pause():
+    if not timer_state["active_category"]:
+        return jsonify({"success": False, "message": "No timer running."}), 400
+    if timer_state["paused"]:
+        return jsonify({"success": False, "message": "Already paused."}), 400
+
+    timer_state["accumulated_seconds"] += time.time() - timer_state["start_time"]
+    timer_state["start_time"] = None
+    timer_state["paused"] = True
+
+    logging.info(f"Paused '{timer_state['active_category']}' at {fmt(timer_state['accumulated_seconds'])}")
     return jsonify({
         "success": True,
-        "message": f"Started tracking '{category}' on {today}",
-        "category": category,
-        "day": today,
-        "start_time": timer_state["start_time"]
+        "elapsed": fmt(timer_state["accumulated_seconds"]),
+        "elapsed_seconds": int(timer_state["accumulated_seconds"])
     })
+
+@app.route('/api/resume', methods=['POST'])
+def api_resume():
+    if not timer_state["active_category"]:
+        return jsonify({"success": False, "message": "No timer running."}), 400
+    if not timer_state["paused"]:
+        return jsonify({"success": False, "message": "Timer is not paused."}), 400
+
+    timer_state["start_time"] = time.time()
+    timer_state["paused"] = False
+
+    logging.info(f"Resumed '{timer_state['active_category']}'")
+    return jsonify({"success": True, "category": timer_state["active_category"]})
 
 @app.route('/api/stop', methods=['POST'])
 def api_stop():
     if not timer_state["active_category"]:
-        return jsonify({
-            "success": False,
-            "message": "No timer running."
-        }), 400
-    
-    elapsed = timedelta(seconds=time.time() - timer_state["start_time"])
-    today = DAYS[datetime.today().weekday()]
+        return jsonify({"success": False, "message": "No timer running."}), 400
+
+    elapsed = current_elapsed()
     category = timer_state["active_category"]
-    
+    today = date.today()
+
     try:
-        new_total = update_excel(category, today, elapsed)
-        
+        new_total, is_new = update_excel(category, today, elapsed)
         timer_state["start_time"] = None
         timer_state["active_category"] = None
-        
-        logging.info(f"Stopped timer for '{category}': duration={format_timedelta(elapsed)}, total={new_total}")
-        
+        timer_state["paused"] = False
+        timer_state["accumulated_seconds"] = 0.0
         return jsonify({
             "success": True,
-            "message": f"Stopped '{category}'",
-            "duration": format_timedelta(elapsed),
+            "category": category,
+            "duration": fmt(elapsed),
             "new_total": new_total,
-            "category": category
+            "is_new_category": is_new
         })
     except Exception as e:
-        logging.error(f"Error stopping timer: {e}", exc_info=True)
-        return jsonify({
-            "success": False,
-            "message": f"Error updating Excel: {str(e)}"
-        }), 500
+        logging.error(f"Stop error: {e}", exc_info=True)
+        timer_state["start_time"] = None
+        timer_state["active_category"] = None
+        timer_state["paused"] = False
+        timer_state["accumulated_seconds"] = 0.0
+        return jsonify({"success": False, "message": str(e)}), 500
 
 @app.route('/api/status', methods=['GET'])
 def api_status():
     if timer_state["active_category"]:
-        elapsed = timedelta(seconds=time.time() - timer_state["start_time"])
+        elapsed = current_elapsed()
         return jsonify({
             "active": True,
+            "paused": timer_state["paused"],
             "category": timer_state["active_category"],
-            "elapsed": format_timedelta(elapsed),
-            "elapsed_seconds": int(elapsed.total_seconds())
+            "elapsed": fmt(elapsed),
+            "elapsed_seconds": int(elapsed)
         })
-    else:
-        return jsonify({
-            "active": False,
-            "message": "No timer currently running."
-        })
+    return jsonify({"active": False, "paused": False})
 
-@app.route('/api/categories', methods=['GET'])
-def api_categories():
-    return jsonify({
-        "categories": CATEGORIES,
-        "days": DAYS,
-        "current_week": CURRENT_WEEK
-    })
+@app.route('/api/today', methods=['GET'])
+def api_today():
+    """Read today's totals directly from the spreadsheet."""
+    try:
+        wb = openpyxl.load_workbook(EXCEL_FILE)
+        ws = wb.active
+        col = day_col_for_date(ws, date.today())
+        if col is None:
+            return jsonify({"totals": []})
+        totals = []
+        for row in range(2, ws.max_row + 1):
+            cat = ws.cell(row=row, column=1).value
+            if not cat:
+                continue
+            secs = get_cell_seconds(ws.cell(row=row, column=col))
+            if secs > 0:
+                totals.append({"category": str(cat), "total": fmt(secs), "seconds": int(secs)})
+        totals.sort(key=lambda x: x["seconds"], reverse=True)
+        return jsonify({
+            "totals": totals,
+            "date": date.today().strftime("%A, %B %d").replace(" 0", " ")
+        })
+    except Exception as e:
+        logging.error(f"api_today error: {e}", exc_info=True)
+        return jsonify({"totals": [], "error": str(e)})
 
 def open_browser():
-    """Open browser after brief delay to ensure server is running"""
     time.sleep(1.5)
     webbrowser.open('http://localhost:5000')
 
 if __name__ == '__main__':
-    print(f"\n{'='*60}")
-    print(f"  Deep Focused Work Tracker")
-    print(f"{'='*60}")
-    print(f"  Current Week: {CURRENT_WEEK}")
-    print(f"  Semester Start: {SEMESTER_START.date()}")
-    print(f"  Excel File: {EXCEL_FILE}")
-    print(f"{'='*60}")
-    print(f"  Starting server at http://localhost:5000")
-    print(f"  Browser will open automatically...")
-    print(f"  Press Ctrl+C to stop\n")
-    
-    # Open browser in background thread
+    print(f"\n{'='*50}")
+    print(f"  Work Tracker 2026")
+    print(f"  http://localhost:5000")
+    print(f"{'='*50}\n")
     threading.Thread(target=open_browser, daemon=True).start()
-    
-    # Start Flask server
     app.run(debug=True, port=5000, use_reloader=False)
