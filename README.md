@@ -71,7 +71,7 @@ Hides all columns before today using Excel's outline/grouping feature. Safe to r
 ```
 python create_tracker.py
 ```
-Creates a fresh `Work Tracker Template.xlsx` with the default categories and past days collapsed. **This overwrites the existing file** — back it up first if you have data you want to keep.
+Creates a fresh `Work Tracker Template.xlsx` with the default categories and past days collapsed. **This overwrites the existing file** 
 
 ---
 
