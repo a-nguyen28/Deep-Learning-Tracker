@@ -9,33 +9,63 @@
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-  :root {
+  /* 
+    We define themes as data attributes on the body. 
+    This is like an API for your design. When the attribute changes, 
+    the browser instantly repaints using the new measurements.
+  */
+  :root, body[data-theme="dark"] {
     --bg: #0a0a0f;
     --surface: #111118;
     --surface2: #1a1a24;
     --border: #2a2a38;
     --accent: #7c6af7;
-    --accent-dim: #4a3fa8;
     --green: #4ade80;
     --red: #f87171;
     --text: #e8e8f0;
     --muted: #6b6b80;
-    --mono: 'JetBrains Mono', monospace;
-    --sans: 'Space Grotesk', sans-serif;
+  }
+
+  body[data-theme="light"] {
+    --bg: #f3f4f6;
+    --surface: #ffffff;
+    --surface2: #f9fafb;
+    --border: #e5e7eb;
+    --accent: #6366f1;
+    --green: #22c55e;
+    --red: #ef4444;
+    --text: #111827;
+    --muted: #6b7280;
+  }
+
+  body[data-theme="neon"] {
+    --bg: #09090b;
+    --surface: #18181b;
+    --surface2: #27272a;
+    --border: #3f3f46;
+    --accent: #06b6d4;
+    --green: #10b981;
+    --red: #f43f5e;
+    --text: #f4f4f5;
+    --muted: #a1a1aa;
   }
 
   body {
-    background: var(--bg);
+    background-color: var(--bg);
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
     color: var(--text);
-    font-family: var(--sans);
+    font-family: 'Space Grotesk', sans-serif;
     min-height: 100vh;
     display: flex;
     flex-direction: column;
     align-items: center;
     padding: 40px 20px;
+    transition: background-color 0.5s ease, color 0.5s ease;
   }
 
-  /* subtle grid texture */
+  /* Grid texture hidden if custom image is present */
   body::before {
     content: '';
     position: fixed;
@@ -47,6 +77,7 @@
     pointer-events: none;
     z-index: 0;
   }
+  body.has-bg-image::before { display: none; }
 
   .container {
     position: relative;
@@ -59,12 +90,14 @@
   }
 
   header {
-    text-align: center;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     padding: 10px 0 4px;
   }
 
   header h1 {
-    font-family: var(--mono);
+    font-family: 'JetBrains Mono', monospace;
     font-size: 13px;
     font-weight: 400;
     letter-spacing: 0.25em;
@@ -73,33 +106,96 @@
   }
 
   #date-display {
-    font-family: var(--mono);
+    font-family: 'JetBrains Mono', monospace;
     font-size: 11px;
     color: var(--muted);
-    margin-top: 4px;
     letter-spacing: 0.1em;
   }
 
-  /* ── main card ── */
+  /* ── Settings Dropdown ── */
+  .settings-wrapper {
+    position: relative;
+  }
+
+  #btn-settings {
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    font-size: 16px;
+    cursor: pointer;
+    transition: color 0.2s;
+  }
+  
+  #btn-settings:hover { color: var(--text); }
+
+  #settings-menu {
+    position: absolute;
+    top: 30px;
+    right: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    width: 220px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    display: none;
+    flex-direction: column;
+    gap: 12px;
+    z-index: 200;
+  }
+
+  #settings-menu.visible {
+    display: flex;
+  }
+
+  .settings-group { display: flex; flex-direction: column; gap: 4px; }
+  .settings-group label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+  }
+  
+  .settings-group select, .settings-group input[type="file"] {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px;
+    border-radius: 4px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 12px;
+    width: 100%;
+  }
+
+  #btn-clear-bg {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--red);
+    padding: 6px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    margin-top: 4px;
+  }
+
+  /* ── Main UI Card ── */
   .card {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 12px;
     padding: 28px;
+    backdrop-filter: blur(10px); /* Looks great over custom backgrounds */
+    box-shadow: 0 8px 32px rgba(0,0,0,0.2);
   }
 
-  /* ── category input ── */
-  .input-wrapper {
-    position: relative;
-    margin-bottom: 20px;
-  }
-
+  .input-wrapper { position: relative; margin-bottom: 20px; }
   .input-label {
     font-size: 10px;
     letter-spacing: 0.2em;
     text-transform: uppercase;
     color: var(--muted);
-    font-family: var(--mono);
+    font-family: 'JetBrains Mono', monospace;
     margin-bottom: 8px;
     display: block;
   }
@@ -110,322 +206,98 @@
     border: 1px solid var(--border);
     border-radius: 8px;
     padding: 12px 16px;
-    font-family: var(--sans);
+    font-family: 'Space Grotesk', sans-serif;
     font-size: 16px;
     font-weight: 500;
     color: var(--text);
     outline: none;
     transition: border-color 0.2s, box-shadow 0.2s;
   }
-
   #category-input:focus {
     border-color: var(--accent);
     box-shadow: 0 0 0 3px rgba(124,106,247,0.12);
   }
 
-  #category-input:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  /* autocomplete dropdown */
+  /* Autocomplete & Timer & Buttons (Kept mostly identical to your design) */
   #autocomplete-list {
-    position: absolute;
-    top: calc(100% + 4px);
-    left: 0; right: 0;
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    overflow: hidden;
-    z-index: 100;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-    display: none;
+    position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; display: none; z-index: 100;
   }
+  .autocomplete-item { padding: 10px 16px; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 10px; }
+  .autocomplete-item:hover, .autocomplete-item.active { background: rgba(124,106,247,0.15); color: var(--accent); }
+  .autocomplete-item .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+  .new-badge { margin-left: auto; font-size: 9px; color: var(--green); background: rgba(74,222,128,0.1); padding: 2px 6px; border-radius: 4px; }
 
-  .autocomplete-item {
-    padding: 10px 16px;
-    font-size: 14px;
-    cursor: pointer;
-    transition: background 0.1s;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
+  .timer-display { text-align: center; padding: 16px 0; }
+  #timer { font-family: 'JetBrains Mono', monospace; font-size: 52px; font-weight: 300; color: var(--text); line-height: 1; transition: color 0.3s; }
+  #timer.running { color: var(--green); }
+  #timer-category { font-size: 12px; font-family: 'JetBrains Mono', monospace; color: var(--muted); margin-top: 8px; min-height: 18px; }
 
-  .autocomplete-item:hover,
-  .autocomplete-item.active {
-    background: rgba(124,106,247,0.15);
-    color: var(--accent);
-  }
+  .btn-row { display: flex; gap: 12px; margin-top: 20px; }
+  button { flex: 1; padding: 13px; border-radius: 8px; border: none; font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+  #btn-start { background: var(--accent); color: white; }
+  #btn-pause, #btn-stop { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+  #btn-pause:not(:disabled) { border-color: #fbbf24; color: #fbbf24; }
+  #btn-stop:not(:disabled) { border-color: var(--red); color: var(--red); }
+  button:disabled { opacity: 0.35; cursor: not-allowed; }
 
-  .autocomplete-item .dot {
-    width: 6px; height: 6px;
-    border-radius: 50%;
-    background: var(--accent);
-    opacity: 0.6;
-    flex-shrink: 0;
-  }
+  #status-msg { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-align: center; min-height: 16px; margin-top: 8px; color: var(--muted); }
+  #status-msg.success { color: var(--green); } #status-msg.error { color: var(--red); }
 
-  .new-badge {
-    margin-left: auto;
-    font-size: 9px;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    font-family: var(--mono);
-    color: var(--green);
-    background: rgba(74,222,128,0.1);
-    padding: 2px 6px;
-    border-radius: 4px;
-    border: 1px solid rgba(74,222,128,0.25);
-  }
-
-  /* ── timer display ── */
-  .timer-display {
-    text-align: center;
-    padding: 16px 0;
-  }
-
-  #timer {
-    font-family: var(--mono);
-    font-size: 52px;
-    font-weight: 300;
-    letter-spacing: -0.02em;
-    color: var(--text);
-    line-height: 1;
-    transition: color 0.3s;
-  }
-
-  #timer.running {
-    color: var(--green);
-  }
-
-  #timer-category {
-    font-size: 12px;
-    font-family: var(--mono);
-    color: var(--muted);
-    margin-top: 8px;
-    letter-spacing: 0.1em;
-    min-height: 18px;
-  }
-
-  /* ── buttons ── */
-  .btn-row {
-    display: flex;
-    gap: 12px;
-    margin-top: 20px;
-  }
-
-  button {
-    flex: 1;
-    padding: 13px;
-    border-radius: 8px;
-    border: none;
-    font-family: var(--sans);
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.15s;
-    letter-spacing: 0.03em;
-  }
-
-  #btn-start {
-    background: var(--accent);
-    color: white;
-  }
-
-  #btn-start:hover:not(:disabled) {
-    background: #9182ff;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 20px rgba(124,106,247,0.35);
-  }
-
-  #btn-pause {
-    background: transparent;
-    border: 1px solid var(--border);
-    color: var(--muted);
-    flex: 0.7;
-  }
-
-  #btn-pause:not(:disabled) {
-    border-color: #fbbf24;
-    color: #fbbf24;
-  }
-
-  #btn-pause:not(:disabled):hover {
-    background: rgba(251,191,36,0.1);
-    transform: translateY(-1px);
-  }
-
-  #btn-pause.resuming:not(:disabled) {
-    border-color: var(--green);
-    color: var(--green);
-  }
-
-  #btn-pause.resuming:not(:disabled):hover {
-    background: rgba(74,222,128,0.1);
-  }
-
-  #btn-stop {
-    background: transparent;
-    border: 1px solid var(--border);
-    color: var(--muted);
-  }
-
-  #btn-stop:not(:disabled) {
-    border-color: var(--red);
-    color: var(--red);
-  }
-
-  #btn-stop:not(:disabled):hover {
-    background: rgba(248,113,113,0.1);
-    transform: translateY(-1px);
-  }
-
-  button:disabled {
-    opacity: 0.35;
-    cursor: not-allowed;
-    transform: none !important;
-  }
-
-  /* ── status message ── */
-  #status-msg {
-    font-family: var(--mono);
-    font-size: 11px;
-    text-align: center;
-    min-height: 16px;
-    color: var(--muted);
-    letter-spacing: 0.05em;
-    margin-top: 8px;
-    transition: color 0.3s;
-  }
-
-  #status-msg.success { color: var(--green); }
-  #status-msg.error   { color: var(--red); }
-
-  /* ── today's log ── */
-  .section-label {
-    font-size: 10px;
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    color: var(--muted);
-    font-family: var(--mono);
-    margin-bottom: 12px;
-  }
-
-  #today-log {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-
-  .log-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 9px 14px;
-    background: var(--surface2);
-    border-radius: 6px;
-    border: 1px solid var(--border);
-    animation: fadeIn 0.25s ease;
-  }
-
-  .log-cat {
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--text);
-  }
-
-  .log-time {
-    font-family: var(--mono);
-    font-size: 12px;
-    color: var(--accent);
-  }
-
-  .log-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 12px;
-  }
-
-  .log-header .section-label { margin-bottom: 0; }
-
-  #btn-refresh {
-    flex: none;
-    width: 28px; height: 28px;
-    padding: 0;
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    color: var(--muted);
-    font-size: 14px;
-    cursor: pointer;
-    transition: all 0.15s;
-    display: flex; align-items: center; justify-content: center;
-  }
-
-  #btn-refresh:hover { color: var(--accent); border-color: var(--accent); transform: rotate(90deg); }
-
-  .empty-log {
-    font-family: var(--mono);
-    font-size: 11px;
-    color: var(--muted);
-    text-align: center;
-    padding: 16px;
-  }
-
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(4px); }
-    to   { opacity: 1; transform: none; }
-  }
-
-  /* pulse ring when running */
-  .pulse-ring {
-    display: inline-block;
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    background: var(--green);
-    margin-right: 8px;
-    position: relative;
-    top: -1px;
-    vertical-align: middle;
-  }
-
-  .pulse-ring::after {
-    content: '';
-    position: absolute;
-    inset: -4px;
-    border-radius: 50%;
-    border: 2px solid var(--green);
-    animation: pulse 1.4s ease-out infinite;
-    opacity: 0;
-  }
-
-  @keyframes pulse {
-    0%   { transform: scale(0.8); opacity: 0.8; }
-    100% { transform: scale(2); opacity: 0; }
-  }
+  .log-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .section-label { font-size: 10px; text-transform: uppercase; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+  #today-log { display: flex; flex-direction: column; gap: 6px; }
+  .log-row { display: flex; justify-content: space-between; padding: 9px 14px; background: var(--surface2); border-radius: 6px; border: 1px solid var(--border); }
+  .log-cat { font-size: 13px; font-weight: 500; color: var(--text); }
+  .log-time { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); }
+  .empty-log { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); text-align: center; padding: 16px; }
+  
+  .pulse-ring { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--green); margin-right: 8px; position: relative; top: -1px; }
 </style>
 </head>
 <body>
 <div class="container">
 
   <header>
-    <h1>Work Tracker</h1>
-    <div id="date-display"></div>
+    <div>
+      <h1>Work Tracker</h1>
+      <div id="date-display"></div>
+    </div>
+    
+    <div class="settings-wrapper">
+      <button id="btn-settings" title="Settings">⚙️</button>
+      <div id="settings-menu">
+        <div class="settings-group">
+          <label>Theme</label>
+          <select id="theme-select">
+            <option value="dark">Dark</option>
+            <option value="light">Light</option>
+            <option value="neon">Neon</option>
+          </select>
+        </div>
+        <div class="settings-group">
+          <label>Auto-Rotate Theme</label>
+          <select id="rotate-select">
+            <option value="none">Off</option>
+            <option value="click">On Timer Start</option>
+            <option value="hourly">Hourly</option>
+            <option value="daily">Daily</option>
+          </select>
+        </div>
+        <div class="settings-group">
+          <label>Custom Background</label>
+          <input type="file" id="bg-upload" accept="image/*">
+          <button id="btn-clear-bg" style="display:none;">Clear Image</button>
+        </div>
+      </div>
+    </div>
   </header>
 
-  <!-- main card -->
   <div class="card">
     <div class="input-wrapper">
       <span class="input-label">Category</span>
-      <input
-        id="category-input"
-        type="text"
-        placeholder="e.g. Coursework, UAV Lab..."
-        autocomplete="off"
-        spellcheck="false"
-      />
+      <input id="category-input" type="text" placeholder="e.g. Personal, Employment..." autocomplete="off">
       <div id="autocomplete-list"></div>
     </div>
 
@@ -439,15 +311,12 @@
       <button id="btn-pause" disabled>Pause</button>
       <button id="btn-stop" disabled>Stop</button>
     </div>
-
     <div id="status-msg"></div>
   </div>
 
-  <!-- today's log -->
   <div class="card">
     <div class="log-header">
       <div class="section-label">Today's log</div>
-      <button id="btn-refresh" title="Refresh from spreadsheet">↻</button>
     </div>
     <div id="today-log"><div class="empty-log">nothing tracked yet today</div></div>
   </div>
@@ -460,298 +329,259 @@ let categories = [];
 let timerInterval = null;
 let activeIndex = -1;
 
-// ── date display ──────────────────────────────────────────
+// ── UI Settings & Rotation Logic ──────────────────────────
+const themes = ['dark', 'light', 'neon'];
+const domBody = document.body;
+const themeSelect = document.getElementById('theme-select');
+const rotateSelect = document.getElementById('rotate-select');
+const bgUpload = document.getElementById('bg-upload');
+const btnClearBg = document.getElementById('btn-clear-bg');
+const settingsToggle = document.getElementById('btn-settings');
+const settingsMenu = document.getElementById('settings-menu');
+
+// Load stored settings
+const savedTheme = localStorage.getItem('wt_theme') || 'dark';
+const savedRotate = localStorage.getItem('wt_rotate') || 'none';
+const savedBg = localStorage.getItem('wt_bg');
+
+themeSelect.value = savedTheme;
+rotateSelect.value = savedRotate;
+applyTheme(savedTheme);
+
+if (savedBg) {
+  applyBackground(savedBg);
+  btnClearBg.style.display = 'block';
+}
+
+function applyTheme(theme) {
+  domBody.setAttribute('data-theme', theme);
+  localStorage.setItem('wt_theme', theme);
+  themeSelect.value = theme;
+}
+
+function applyBackground(dataUrl) {
+  domBody.style.backgroundImage = `url(${dataUrl})`;
+  domBody.classList.add('has-bg-image');
+}
+
+function checkRotation(triggerEvent) {
+  const mode = rotateSelect.value;
+  if (mode === 'none') return;
+  
+  const lastRotate = parseInt(localStorage.getItem('wt_last_rotate') || '0', 10);
+  const now = Date.now();
+  let shouldRotate = false;
+
+  if (mode === 'click' && triggerEvent === 'click') shouldRotate = true;
+  if (mode === 'hourly' && (now - lastRotate) > 3600000) shouldRotate = true;
+  if (mode === 'daily' && (now - lastRotate) > 86400000) shouldRotate = true;
+
+  if (shouldRotate) {
+    const currentTheme = domBody.getAttribute('data-theme');
+    const nextIndex = (themes.indexOf(currentTheme) + 1) % themes.length;
+    applyTheme(themes[nextIndex]);
+    localStorage.setItem('wt_last_rotate', now.toString());
+  }
+}
+
+// Check time-based rotation every minute
+setInterval(() => checkRotation('timer'), 60000);
+// Check immediately on load
+checkRotation('timer');
+
+// Settings Event Listeners
+settingsToggle.addEventListener('click', () => settingsMenu.classList.toggle('visible'));
+
+themeSelect.addEventListener('change', (e) => applyTheme(e.target.value));
+rotateSelect.addEventListener('change', (e) => localStorage.setItem('wt_rotate', e.target.value));
+
+bgUpload.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  
+  const reader = new FileReader();
+  reader.onload = function(event) {
+    const dataUrl = event.target.result;
+    applyBackground(dataUrl);
+    // Note: LocalStorage has a ~5MB limit. 
+    try {
+      localStorage.setItem('wt_bg', dataUrl);
+      btnClearBg.style.display = 'block';
+    } catch (err) {
+      alert("Image is too large to save locally. It will clear on reload.");
+    }
+  };
+  reader.readAsDataURL(file);
+});
+
+btnClearBg.addEventListener('click', () => {
+  localStorage.removeItem('wt_bg');
+  domBody.style.backgroundImage = 'none';
+  domBody.classList.remove('has-bg-image');
+  bgUpload.value = '';
+  btnClearBg.style.display = 'none';
+});
+
+// Hide settings if clicking outside
+document.addEventListener('click', (e) => {
+  if (!settingsToggle.contains(e.target) && !settingsMenu.contains(e.target)) {
+    settingsMenu.classList.remove('visible');
+  }
+});
+
+
+// ── Original Timer Logic (Modified slightly to trigger rotation) ──
 const now = new Date();
-document.getElementById('date-display').textContent =
+document.getElementById('date-display').textContent = 
   now.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' }).toUpperCase();
 
-// ── fetch categories ──────────────────────────────────────
 async function loadCategories() {
   try {
     const r = await fetch(`${API}/api/categories`);
     const d = await r.json();
     categories = d.categories || [];
-  } catch(e) { console.warn('Could not load categories', e); }
+  } catch(e) { console.warn('No DB connected yet'); }
 }
 
-// ── autocomplete ──────────────────────────────────────────
 const input = document.getElementById('category-input');
 const list  = document.getElementById('autocomplete-list');
 
 function showAutocomplete(val) {
-  list.innerHTML = '';
-  activeIndex = -1;
+  list.innerHTML = ''; activeIndex = -1;
   if (!categories.length) { list.style.display = 'none'; return; }
-
   const q = val.toLowerCase();
   const matches = val ? categories.filter(c => c.toLowerCase().includes(q)) : [...categories];
   const exactMatch = categories.some(c => c.toLowerCase() === q);
-
   const items = [...matches];
-  if (!exactMatch && val.trim()) {
-    items.push({ label: val.trim(), isNew: true });
-  }
-
+  if (!exactMatch && val.trim()) items.push({ label: val.trim(), isNew: true });
   if (!items.length) { list.style.display = 'none'; return; }
 
-  items.forEach((item, i) => {
+  items.forEach((item) => {
     const div = document.createElement('div');
     div.className = 'autocomplete-item';
     const name = typeof item === 'string' ? item : item.label;
     const isNew = typeof item === 'object' && item.isNew;
-
     div.innerHTML = `<span class="dot"></span><span>${name}</span>${isNew ? '<span class="new-badge">new</span>' : ''}`;
-    div.addEventListener('mousedown', e => {
-      e.preventDefault();
-      input.value = name;
-      list.style.display = 'none';
-    });
+    div.addEventListener('mousedown', e => { e.preventDefault(); input.value = name; list.style.display = 'none'; });
     list.appendChild(div);
   });
-
   list.style.display = 'block';
 }
 
 input.addEventListener('input', () => showAutocomplete(input.value));
 input.addEventListener('blur', () => setTimeout(() => list.style.display = 'none', 150));
 input.addEventListener('focus', () => showAutocomplete(input.value));
-
 input.addEventListener('keydown', e => {
   const items = list.querySelectorAll('.autocomplete-item');
-  if (e.key === 'ArrowDown') {
-    e.preventDefault();
-    activeIndex = Math.min(activeIndex + 1, items.length - 1);
-    items.forEach((el, i) => el.classList.toggle('active', i === activeIndex));
-  } else if (e.key === 'ArrowUp') {
-    e.preventDefault();
-    activeIndex = Math.max(activeIndex - 1, -1);
-    items.forEach((el, i) => el.classList.toggle('active', i === activeIndex));
-  } else if (e.key === 'Enter') {
-    if (activeIndex >= 0 && items[activeIndex]) {
-      input.value = items[activeIndex].querySelector('span:nth-child(2)').textContent;
-      list.style.display = 'none';
-    } else {
-      startTimer();
-    }
-  } else if (e.key === 'Escape') {
-    list.style.display = 'none';
+  if (e.key === 'ArrowDown') { e.preventDefault(); activeIndex = Math.min(activeIndex + 1, items.length - 1); items.forEach((el, i) => el.classList.toggle('active', i === activeIndex)); } 
+  else if (e.key === 'ArrowUp') { e.preventDefault(); activeIndex = Math.max(activeIndex - 1, -1); items.forEach((el, i) => el.classList.toggle('active', i === activeIndex)); } 
+  else if (e.key === 'Enter') { 
+    if (activeIndex >= 0 && items[activeIndex]) { input.value = items[activeIndex].querySelector('span:nth-child(2)').textContent; list.style.display = 'none'; } 
+    else startTimer(); 
   }
+  else if (e.key === 'Escape') list.style.display = 'none';
 });
 
-// ── timer ─────────────────────────────────────────────────
-function fmtSeconds(s) {
-  s = Math.floor(s);
-  return `${Math.floor(s/3600)}:${String(Math.floor((s%3600)/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
-}
+function fmtSeconds(s) { s = Math.floor(s); return `${Math.floor(s/3600)}:${String(Math.floor((s%3600)/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`; }
 
 let startTs = null;
-
 function startLocalTimer(category) {
   startTs = Date.now();
-  const timerEl = document.getElementById('timer');
-  const catEl   = document.getElementById('timer-category');
-  timerEl.classList.add('running');
-  catEl.innerHTML = `<span class="pulse-ring"></span>${category}`;
-
-  timerInterval = setInterval(() => {
-    timerEl.textContent = fmtSeconds((Date.now() - startTs) / 1000);
-  }, 1000);
+  document.getElementById('timer').classList.add('running');
+  document.getElementById('timer-category').innerHTML = `<span class="pulse-ring"></span>${category}`;
+  timerInterval = setInterval(() => { document.getElementById('timer').textContent = fmtSeconds((Date.now() - startTs) / 1000); }, 1000);
 }
 
-function stopLocalTimer() {
-  clearInterval(timerInterval);
-  timerInterval = null;
-  document.getElementById('timer').classList.remove('running');
-  document.getElementById('timer').textContent = '0:00:00';
-  document.getElementById('timer-category').innerHTML = '&nbsp;';
-}
+function stopLocalTimer() { clearInterval(timerInterval); timerInterval = null; document.getElementById('timer').classList.remove('running'); document.getElementById('timer').textContent = '0:00:00'; document.getElementById('timer-category').innerHTML = '&nbsp;'; }
+function freezeLocalTimer() { clearInterval(timerInterval); timerInterval = null; document.getElementById('timer').classList.remove('running'); }
 
-function freezeLocalTimer() {
-  clearInterval(timerInterval);
-  timerInterval = null;
-  document.getElementById('timer').classList.remove('running');
-}
-
-// ── button state helper ───────────────────────────────────
 function setButtons({ running, paused }) {
-  const btnStart = document.getElementById('btn-start');
-  const btnPause = document.getElementById('btn-pause');
-  const btnStop  = document.getElementById('btn-stop');
-
-  if (!running) {
-    // idle
-    btnStart.disabled = false;
-    btnPause.disabled = true;
-    btnPause.textContent = 'Pause';
-    btnPause.classList.remove('resuming');
-    btnStop.disabled = true;
-    input.disabled = false;
-  } else if (paused) {
-    // paused
-    btnStart.disabled = true;
-    btnPause.disabled = false;
-    btnPause.textContent = 'Resume';
-    btnPause.classList.add('resuming');
-    btnStop.disabled = false;
-  } else {
-    // running
-    btnStart.disabled = true;
-    btnPause.disabled = false;
-    btnPause.textContent = 'Pause';
-    btnPause.classList.remove('resuming');
-    btnStop.disabled = false;
-    input.disabled = true;
-  }
+  const bStart = document.getElementById('btn-start'), bPause = document.getElementById('btn-pause'), bStop = document.getElementById('btn-stop');
+  if (!running) { bStart.disabled = false; bPause.disabled = true; bPause.textContent = 'Pause'; bStop.disabled = true; input.disabled = false; } 
+  else if (paused) { bStart.disabled = true; bPause.disabled = false; bPause.textContent = 'Resume'; bStop.disabled = false; } 
+  else { bStart.disabled = true; bPause.disabled = false; bPause.textContent = 'Pause'; bStop.disabled = false; input.disabled = true; }
 }
 
-// ── API calls ─────────────────────────────────────────────
 function setStatus(msg, type = '') {
-  const el = document.getElementById('status-msg');
-  el.textContent = msg;
-  el.className = type;
+  const el = document.getElementById('status-msg'); el.textContent = msg; el.className = type;
 }
+
+let bankedSeconds = 0; let timer_state_category = '';
 
 async function startTimer() {
   const cat = input.value.trim();
   if (!cat) { setStatus('enter a category first', 'error'); return; }
+  
+  // Trigger rotation logic on click
+  checkRotation('click');
 
   try {
-    const r = await fetch(`${API}/api/start`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ category: cat })
-    });
+    const r = await fetch(`${API}/api/start`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ category: cat }) });
     const d = await r.json();
     if (!d.success) { setStatus(d.message, 'error'); return; }
-
     if (!categories.includes(cat)) categories.push(cat);
-
-    bankedSeconds = 0;
-    setButtons({ running: true, paused: false });
-    startLocalTimer(cat);
-    setStatus(`tracking · ${d.day}`, '');
-  } catch(e) {
-    setStatus('server error', 'error');
-  }
+    bankedSeconds = 0; setButtons({ running: true, paused: false }); startLocalTimer(cat); setStatus(`tracking · ${d.day}`, '');
+  } catch(e) { setStatus('server error', 'error'); }
 }
 
-let bankedSeconds = 0;  // locally tracked paused time
-
 async function pauseOrResume() {
-  const paused = document.getElementById('btn-pause').classList.contains('resuming');
-
+  const paused = document.getElementById('btn-pause').textContent === 'Resume';
   try {
     const endpoint = paused ? '/api/resume' : '/api/pause';
     const r = await fetch(`${API}${endpoint}`, { method: 'POST' });
     const d = await r.json();
     if (!d.success) { setStatus(d.message, 'error'); return; }
-
     if (paused) {
-      // resuming — restart ticker from locally banked seconds
       startTs = Date.now() - bankedSeconds * 1000;
-      const timerEl = document.getElementById('timer');
-      timerEl.classList.add('running');
-      timerInterval = setInterval(() => {
-        timerEl.textContent = fmtSeconds((Date.now() - startTs) / 1000);
-      }, 1000);
-      setButtons({ running: true, paused: false });
-      setStatus(`resumed · ${timer_state_category}`, '');
+      document.getElementById('timer').classList.add('running');
+      timerInterval = setInterval(() => { document.getElementById('timer').textContent = fmtSeconds((Date.now() - startTs) / 1000); }, 1000);
+      setButtons({ running: true, paused: false }); setStatus(`resumed · ${timer_state_category}`, '');
     } else {
-      // pausing — bank current elapsed locally, freeze display
-      bankedSeconds = (Date.now() - startTs) / 1000;
-      freezeLocalTimer();
+      bankedSeconds = (Date.now() - startTs) / 1000; freezeLocalTimer();
       document.getElementById('timer').textContent = fmtSeconds(bankedSeconds);
-      setButtons({ running: true, paused: true });
-      setStatus(`paused · ${fmtSeconds(bankedSeconds)}`, '');
+      setButtons({ running: true, paused: true }); setStatus(`paused · ${fmtSeconds(bankedSeconds)}`, '');
     }
-  } catch(e) {
-    setStatus('server error', 'error');
-  }
+  } catch(e) { setStatus('server error', 'error'); }
 }
-
-let timer_state_category = '';
 
 async function stopTimer() {
   try {
     const r = await fetch(`${API}/api/stop`, { method: 'POST' });
     const d = await r.json();
     if (!d.success) { setStatus(d.message, 'error'); return; }
-
-    bankedSeconds = 0;
-    stopLocalTimer();
-    input.value = '';
-    timer_state_category = '';
-    setButtons({ running: false, paused: false });
-
-    const msg = d.is_new_category
-      ? `✦ new category created · ${d.duration} logged`
-      : `saved · ${d.duration} · total today: ${d.new_total}`;
-    setStatus(msg, 'success');
-
+    bankedSeconds = 0; stopLocalTimer(); input.value = ''; timer_state_category = ''; setButtons({ running: false, paused: false });
+    setStatus(d.is_new_category ? `✦ new category created · ${d.duration} logged` : `saved · ${d.duration} · total today: ${d.new_total}`, 'success');
     loadTodayLog();
-  } catch(e) {
-    setStatus('server error', 'error');
-  }
+  } catch(e) { setStatus('server error', 'error'); }
 }
 
-// ── today's log ───────────────────────────────────────────
 async function loadTodayLog() {
   try {
-    const r = await fetch(`${API}/api/today`);
-    const d = await r.json();
+    const r = await fetch(`${API}/api/today`); const d = await r.json();
     const logEl = document.getElementById('today-log');
-
-    if (!d.totals || !d.totals.length) {
-      logEl.innerHTML = '<div class="empty-log">nothing tracked yet today</div>';
-      return;
-    }
-
-    logEl.innerHTML = d.totals.map(t => `
-      <div class="log-row">
-        <span class="log-cat">${t.category}</span>
-        <span class="log-time">${t.total}</span>
-      </div>
-    `).join('');
-  } catch(e) { /* silence */ }
+    if (!d.totals || !d.totals.length) { logEl.innerHTML = '<div class="empty-log">nothing tracked yet today</div>'; return; }
+    logEl.innerHTML = d.totals.map(t => `<div class="log-row"><span class="log-cat">${t.category}</span><span class="log-time">${t.total}</span></div>`).join('');
+  } catch(e) { }
 }
 
-// ── restore active timer on load ──────────────────────────
 async function checkStatus() {
   try {
-    const r = await fetch(`${API}/api/status`);
-    const d = await r.json();
+    const r = await fetch(`${API}/api/status`); const d = await r.json();
     if (d.active) {
-      input.value = d.category;
-      timer_state_category = d.category;
-
-      if (d.paused) {
-        document.getElementById('timer').textContent = d.elapsed;
-        setButtons({ running: true, paused: true });
-        setStatus(`paused · ${d.elapsed}`, '');
-      } else {
-        startTs = Date.now() - d.elapsed_seconds * 1000;
-        startLocalTimer(d.category);
-        setButtons({ running: true, paused: false });
-        setStatus(`tracking · ${d.category}`, '');
-      }
+      input.value = d.category; timer_state_category = d.category;
+      if (d.paused) { document.getElementById('timer').textContent = d.elapsed; setButtons({ running: true, paused: true }); setStatus(`paused · ${d.elapsed}`, ''); } 
+      else { startTs = Date.now() - d.elapsed_seconds * 1000; startLocalTimer(d.category); setButtons({ running: true, paused: false }); setStatus(`tracking · ${d.category}`, ''); }
     }
-  } catch(e) { /* server not up yet */ }
+  } catch(e) { }
 }
 
 document.getElementById('btn-start').addEventListener('click', startTimer);
 document.getElementById('btn-pause').addEventListener('click', pauseOrResume);
 document.getElementById('btn-stop').addEventListener('click', stopTimer);
-document.getElementById('btn-refresh').addEventListener('click', loadTodayLog);
 
-// auto-refresh log every 30s
 setInterval(loadTodayLog, 30000);
 
-// ── init ──────────────────────────────────────────────────
-(async () => {
-  await loadCategories();
-  await checkStatus();
-  await loadTodayLog();
-})();
+(async () => { await loadCategories(); await checkStatus(); await loadTodayLog(); })();
 </script>
 </body>
 </html>
